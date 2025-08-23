@@ -6,11 +6,14 @@ import com.example.ecommerce_spring_react.model.Usuario;
 import com.example.ecommerce_spring_react.service.UsuarioService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Key;
 import java.util.Date;
 
 @RestController
@@ -18,32 +21,17 @@ import java.util.Date;
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
-    @Value("${jwt.secret:segredo_super_secreto}")//isso vem do application.properties
-    private String jwtSecret;
-
-    @Value("${jwt.expiration:86400000}")// 24h
-    private long jwtExpirationMs;
+    private final String jwtSecret = "U0VDUkVUX1NFTkNPRElHRV9FWEFNUExF"; // Base64
+    private final long jwtExpirationMs = 86400000; // 24h
 
     public UsuarioController(UsuarioService usuarioService) {
         this.usuarioService = usuarioService;
     }
 
-    @GetMapping("/me")
-    public ResponseEntity<Usuario> usuarioLogado(Authentication authentication){
-        String email = authentication.getName();// retorna email do usuario logado
-        Usuario usuario = usuarioService.buscarPorEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
-
-        usuario.setSenha(null);
-
-        return ResponseEntity.ok(usuario);
-    }
-
     @PostMapping("/register")
     public ResponseEntity<?> registrar(@RequestBody Usuario usuario) {
-        try{
+        try {
             Usuario novoUsuario = usuarioService.cadastrarUsuario(usuario);
-            novoUsuario.setSenha(null);// nao retorna a senha
             return ResponseEntity.ok(novoUsuario);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -55,19 +43,21 @@ public class UsuarioController {
         return usuarioService.buscarPorEmail(loginRequest.getEmail())
                 .map(usuario -> {
                     if (usuarioService.verificarSenha(loginRequest.getSenha(), usuario.getSenha())) {
+
+                        Key key = Keys.secretKeyFor(SignatureAlgorithm.HS512);//gera chave forte automaticamente
+
                         String token = Jwts.builder()
                                 .setSubject(usuario.getEmail())
-                                .claim("role", usuario.getPapel()) // para permissões
                                 .setIssuedAt(new Date())
                                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
-                                .signWith(SignatureAlgorithm.HS512, jwtSecret)
+                                .signWith(key)
                                 .compact();
 
-                        return ResponseEntity.ok(new LoginResponse(token, usuario.getEmail(), usuario.getNome(), usuario.getPapel()));
+                        return ResponseEntity.ok(new LoginResponse(token, usuario.getEmail(),
+                                usuario.getNome(), usuario.getPapel()));
                     } else {
                         return ResponseEntity.status(401).body("Senha inválida");
                     }
-
                 })
                 .orElse(ResponseEntity.status(404).body("Usuário não encontrado"));
     }

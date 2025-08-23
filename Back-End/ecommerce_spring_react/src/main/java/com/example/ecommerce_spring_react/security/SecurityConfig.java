@@ -1,5 +1,6 @@
 package com.example.ecommerce_spring_react.security;
 
+import com.example.ecommerce_spring_react.service.UsuarioService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -12,26 +13,15 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-    }
+    private final JwtAuthenticationFilter jwtAuthenticationFilter = new JwtAuthenticationFilter();
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // endpoints publicos
-                        .requestMatchers("/auth/**").permitAll() // login e registro abertos
-                        .requestMatchers("/produtos", "/produtos/**").permitAll() //GET liberado
-
-                        //endpoints restritos a ADMIN
-                        .requestMatchers("/produtos").hasRole("ADMIN") //post
-                        .requestMatchers("/produtos/**").hasRole("ADMIN") //put e delete
-
-                        // outras requisiçoes exige login
+                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/produtos", "/produtos/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session ->
