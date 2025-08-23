@@ -6,6 +6,7 @@ import com.example.ecommerce_spring_react.model.Usuario;
 import com.example.ecommerce_spring_react.service.UsuarioService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,8 +20,11 @@ import java.util.Date;
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
-    private final String jwtSecret = "segredo_super_secreto";
-    private final long jwtExpirationMs = 86400000; // 24h
+    @Value("${jwt.secret:segredo_super_secreto}")//isso vem do application.properties
+    private String jwtSecret;
+
+    @Value("${jwt.expiration:86400000}")// 24h
+    private long jwtExpirationMs;
 
     public UsuarioController(UsuarioService usuarioService) {
         this.usuarioService = usuarioService;
@@ -30,6 +34,7 @@ public class UsuarioController {
     public ResponseEntity<?> registrar(@RequestBody Usuario usuario) {
         try{
             Usuario novoUsuario = usuarioService.cadastrarUsuario(usuario);
+            novoUsuario.setSenha(null);// nao retorna a senha
             return ResponseEntity.ok(novoUsuario);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -43,6 +48,7 @@ public class UsuarioController {
                     if (usuarioService.verificarSenha(loginRequest.getSenha(), usuario.getSenha())) {
                         String token = Jwts.builder()
                                 .setSubject(usuario.getEmail())
+                                .claim("role", usuario.getPapel()) // para permissões
                                 .setIssuedAt(new Date())
                                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                                 .signWith(SignatureAlgorithm.HS512, jwtSecret)

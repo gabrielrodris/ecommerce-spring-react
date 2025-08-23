@@ -11,11 +11,10 @@ import java.util.Optional;
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
-    private final BCryptPasswordEncoder passwordEncoder;
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public UsuarioService(UsuarioRepository usuarioRepository){
         this.usuarioRepository = usuarioRepository;
-        this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
     // Post de Usuario
@@ -25,7 +24,14 @@ public class UsuarioService {
         }
         // criptografa a senha antes de salvar
         usuario.setSenha(passwordEncoder.encode(usuario.getSenha()));
-        usuario.setPapel("USER"); // garantindo que o papel seja USER
+
+        // garante que o papel esteja no formato correto
+        if (usuario.getPapel() == null || usuario.getPapel().isEmpty()){
+            usuario.setPapel("ROLE_USER");//padrão
+        } else if (!usuario.getPapel().startsWith("ROLE_")) {
+            usuario.setPapel("ROLE_" + usuario.getPapel().toUpperCase());
+        }
+
         return usuarioRepository.save(usuario);
     }
 

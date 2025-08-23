@@ -21,10 +21,18 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // ✅ Nova forma
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        // endpoints publicos
                         .requestMatchers("/auth/**").permitAll() // login e registro abertos
-                        .anyRequest().authenticated() // resto protegido
+                        .requestMatchers("/produtos", "/produtos/**").permitAll() //GET liberado
+
+                        //endpoints restritos a ADMIN
+                        .requestMatchers("/produtos").hasRole("ADMIN") //post
+                        .requestMatchers("/produtos/**").hasRole("ADMIN") //put e delete
+
+                        // outras requisiçoes exige login
+                        .anyRequest().authenticated()
                 )
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
