@@ -1,11 +1,12 @@
 package com.example.ecommerce_spring_react.security;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
+import com.example.ecommerce_spring_react.service.UsuarioService;
+import io.jsonwebtoken.*;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -14,46 +15,61 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.net.http.HttpHeaders;
+import java.security.SignatureException;
 import java.util.Collections;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final String jwtSecret = "segredo_super_secreto";
+    @Value("${jwt.secret:segredo_super_secreto}")
+    private String jwtSecret;
+
+    private final UsuarioService usuarioService;
+
+    public JwtAuthenticationFilter(UsuarioService usuarioService) {
+        this.usuarioService = usuarioService;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain)
-        throws ServletException, IOException {
-
-        final String header = request.getHeader("Authorization");
-
-        if (header == null || !header.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        final String token = header.substring(7); //pega depois de Bearer
+            throws ServletException, IOException {
 
         try {
-            Claims claims = Jwts.parser()
-                    .setSigningKey(jwtSecret)
-                    .parseClaimsJws(token)
-                    .getBody();
+            String header = request.getHeader("Authorization");
 
-            String email = claims.getSubject();
-            String papel = claims.get("papel", String.class);
+            if (header != null && header.startsWith("Bearer ")) {
+                String token = header.substring(7);
 
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(email, null, Collections.emptyList());
+                Claims claims = Jwts.parser()
+                        .setSigningKey(jwtSecret)
+                        .parseClaimsJws(token)
+                        .getBody();
 
-            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                String email = claims.getSubject();
+                String role = claims.get("role", String.class);
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-        } catch (Exception e) {
-            SecurityContextHolder.clearContext();
+                if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    email, null,
+                                    java.util.List.of(() -> role) // adiciona papel (ROLE_USER / ROLE_ADMIN)
+                            );
+
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                    // Seta no contexto do Spring
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
+            }
+        } catch (ExpiredJwtException e) {
+            logger.error("Token expirado", e);
+        } catch (UnsupportedJwtException | MalformedJwtException | io.jsonwebtoken.SignatureException e) {
+            logger.error("Token inválido", e);
         }
 
-        filterChain.doFilter(request,response);
+        filterChain.doFilter(request, response);
     }
 }
